@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
+import { useEffect } from "react"; // Ensure this import is at the top
 import User from "@/lib/databases/models/user.model";
 import { connectToDatabase } from "@/lib/databases/mongoose";
 import { handleError } from "../utils";
@@ -65,7 +65,10 @@ export async function deleteUser(clerkId: string) {
 
     // Delete user
     const deletedUser = await User.findByIdAndDelete(userToDelete._id);
-    revalidatePath("/");
+
+    if (typeof window !== 'undefined') {
+      revalidatePath("/");
+    }
 
     return deletedUser ? JSON.parse(JSON.stringify(deletedUser)) : null;
   } catch (error) {
