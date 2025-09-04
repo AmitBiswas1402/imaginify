@@ -1,42 +1,33 @@
-/* eslint-disable camelcase */
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import { WebhookEvent } from "@clerk/nextjs/server";
-import { clerkClient } from "@clerk/nextjs/server";
+import { WebhookEvent, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 import { createUser, deleteUser, updateUser } from "@/lib/actions/user.actions";
 
 export async function POST(req: Request) {
-  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
-    throw new Error("Error: Please add WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local");
+    throw new Error("Missing CLERK_WEBHOOK_SECRET in environment variables");
   }
 
-  // Create a new Svix instance with your secret
   const wh = new Webhook(WEBHOOK_SECRET);
 
-  // Get headers
   const headerPayload = await headers();
   const svix_id = headerPayload.get("svix-id");
   const svix_timestamp = headerPayload.get("svix-timestamp");
   const svix_signature = headerPayload.get("svix-signature");
 
-  // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error: Missing Svix headers", {
-      status: 400,
-    });
+    return new Response("Error: Missing Svix headers", { status: 400 });
   }
 
-  // Get body
   const payload = await req.json();
   const body = JSON.stringify(payload);
 
   let evt: WebhookEvent;
 
-  // Verify payload with headers
   try {
     evt = wh.verify(body, {
       "svix-id": svix_id,
@@ -44,13 +35,10 @@ export async function POST(req: Request) {
       "svix-signature": svix_signature,
     }) as WebhookEvent;
   } catch (err) {
-    console.error("Error: Could not verify webhook:", err);
-    return new Response("Error: Verification error", {
-      status: 400,
-    });
+    console.error("Error verifying webhook:", err);
+    return new Response("Verification error", { status: 400 });
   }
 
-  // Extract ID and event type
   const { id } = evt.data;
   const eventType = evt.type;
 
@@ -61,7 +49,7 @@ export async function POST(req: Request) {
       const user = {
         clerkId: id,
         email: email_addresses[0].email_address,
-        username: username!,
+        username: username || "",
         firstName: first_name || "",
         lastName: last_name || "",
         photo: image_url,
@@ -70,11 +58,9 @@ export async function POST(req: Request) {
       const newUser = await createUser(user);
 
       if (newUser) {
-        const client = await clerkClient();
-        await client.users.updateUserMetadata(id, {
-          publicMetadata: {
-            userId: newUser._id,
-          },
+        const clerk = await clerkClient();
+        await clerk.users.updateUserMetadata(id, {
+          publicMetadata: { userId: newUser._id },
         });
       }
 
@@ -87,7 +73,7 @@ export async function POST(req: Request) {
       const user = {
         firstName: first_name || "",
         lastName: last_name || "",
-        username: username!,
+        username: username || "",
         photo: image_url,
       };
 
@@ -97,17 +83,17 @@ export async function POST(req: Request) {
     }
 
     if (eventType === "user.deleted") {
-      if (id) {
-        const deletedUser = await deleteUser(id);
-      } else {
+      if (!id) {
         return new Response("Error: User ID is undefined", { status: 400 });
       }
 
-      return NextResponse.json({ message: "User deleted", user: deleteUser });
+      const deletedUser = await deleteUser(id);
+
+      return NextResponse.json({ message: "User deleted", user: deletedUser });
     }
 
-    console.log(`Received webhook with ID ${id} and event type of ${eventType}`);
-    console.log("Webhook payload:", body);
+    console.log(`Unhandled event: ${eventType}`);
+    console.log("Payload:", body);
 
     return new Response("Webhook received", { status: 200 });
   } catch (error) {

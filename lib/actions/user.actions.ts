@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { useEffect } from "react"; // Ensure this import is at the top
 import User from "@/lib/databases/models/user.model";
 import { connectToDatabase } from "@/lib/databases/mongoose";
 import { handleError } from "../utils";
