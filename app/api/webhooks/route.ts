@@ -8,14 +8,14 @@ import { NextResponse } from "next/server";
 import { createUser, deleteUser, updateUser } from "@/lib/actions/user.actions";
 
 export async function POST(req: Request) {
-  const SIGNING_SECRET = process.env.SIGNING_SECRET;
+  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
-  if (!SIGNING_SECRET) {
-    throw new Error("Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env.local");
+  if (!WEBHOOK_SECRET) {
+    throw new Error("Error: Please add WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local");
   }
 
   // Create a new Svix instance with your secret
-  const wh = new Webhook(SIGNING_SECRET);
+  const wh = new Webhook(WEBHOOK_SECRET);
 
   // Get headers
   const headerPayload = await headers();
